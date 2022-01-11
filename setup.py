@@ -28,6 +28,7 @@ install_requires = [
     'queuelib>=1.4.2',
     'service_identity>=16.0.0',
     'w3lib>=1.17.0',
+    'urllib3>=1.26.7',
     'zope.interface>=4.1.3',
     'protego>=0.1.15',
     'itemadapter>=0.1.0',
