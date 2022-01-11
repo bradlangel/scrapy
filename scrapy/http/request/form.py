@@ -11,9 +11,7 @@ from urllib.parse import urljoin, urlencode, urlsplit, urlunsplit
 from lxml.html import FormElement, HtmlElement, HTMLParser, SelectElement
 from parsel.selector import create_root_node
 from w3lib.html import strip_html5_whitespace
-import six
-import string
-import random
+from urllib3.filepost import encode_multipart_formdata
 from scrapy.http.request import Request
 from scrapy.http.response.text import TextResponse
 from scrapy.utils.python import to_bytes, is_listlike
@@ -80,23 +78,14 @@ class MultipartFormRequest(FormRequest):
 
     def __init__(self, *args, **kwargs):
         formdata = kwargs.pop('formdata', None)
-
-        kwargs.setdefault('method', 'POST')
+        if formdata and kwargs.get('method') is None:
+            kwargs['method'] = 'POST'
 
         super(MultipartFormRequest, self).__init__(*args, **kwargs)
 
-        content_type = self.headers.setdefault(b'Content-Type', [b'multipart/form-data'])[0]
-        method = kwargs.get('method').upper()
-        if formdata and method == 'POST' and content_type == b'multipart/form-data':
-            items = formdata.items() if isinstance(formdata, dict) else formdata
-            self._boundary = ''
-
-            # encode the data using multipart spec
-            self._boundary = to_bytes(''.join(
-                random.choice(string.digits + string.ascii_letters) for i in range(20)), self.encoding)
-            self.headers[b'Content-Type'] = b'multipart/form-data; boundary=' + self._boundary
-            request_data = _multpart_encode(items, self._boundary, self.encoding)
-            self._set_body(request_data)
+        if formdata:
+            body, content_type = encode_multipart_formdata(formdata)
+            self.headers[b'Content-Type'] = content_type.encode('utf-8')
 
 
 class MultipartFile(object):
@@ -167,29 +156,6 @@ def _get_form(
             raise IndexError(f"Form number {formnumber} not found in {response}")
         else:
             return form
-
-
-def _multpart_encode(items, boundary, enc):
-    body = []
-
-    for name, value in items:
-        body.append(b'--' + boundary)
-        if isinstance(value, MultipartFile):
-            file_name = value.name
-            content = value.content
-            content_type = value.mimetype
-
-            body.append(b'Content-Disposition: form-data; name="' + to_bytes(name, enc) + b'"; filename="' + to_bytes(file_name, enc) + b'"')
-            body.append(b'Content-Type: ' + to_bytes(content_type, enc))
-            body.append(b'')
-            body.append(to_bytes(content, enc))
-        else:
-            body.append(b'Content-Disposition: form-data; name="' + to_bytes(name, enc) + b'"')
-            body.append(b'')
-            body.append(to_bytes(value, enc))
-
-    body.append(b'--' + boundary + b'--')
-    return b'\r\n'.join(body)
 
 
 def _get_inputs(
