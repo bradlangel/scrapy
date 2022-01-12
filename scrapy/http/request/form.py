@@ -86,6 +86,7 @@ class MultipartFormRequest(FormRequest):
         if formdata:
             body, content_type = encode_multipart_formdata(formdata)
             self.headers[b'Content-Type'] = content_type.encode('utf-8')
+            self._set_body(body)
 
 
 class MultipartFile(object):
